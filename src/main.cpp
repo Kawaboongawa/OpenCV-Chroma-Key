@@ -23,7 +23,7 @@ const uint isOdd = kernelSize % 2;
 const uint alpha = 0;
 float2 ranges[3];
 cv::Mat masks[3];
-cv::Mat background, foreground, frame, resultImage, bgrSelectedColors, fgrdSelectedColors;;
+cv::Mat background, foreground, frame, resultImage, bgrSelectedColors, fgrdSelectedColors, bgrInpainted;
 
 
 
@@ -91,7 +91,7 @@ void setColor(int x, int y)
 
 void ExtractBackground()
 {
-	cv::Mat hsvForeground, fgrdRes, bgrRes, bgrInpainted;
+	cv::Mat hsvForeground, fgrdRes, bgrRes;
 	cv::cvtColor(frame, hsvForeground, cv::COLOR_BGR2HSV);
 	std::vector<cv::Mat> foregroundHsvChannels(3);
 	split(hsvForeground, foregroundHsvChannels);
@@ -136,12 +136,15 @@ void ExtractBackground()
 	cv::Mat bgrMask = masks[0] & masks[1] & masks[2];
 
 
-	if (bgrSelectedColors.empty())
+	if (fgrdSelectedColors.empty())
 	{
 		frame.copyTo(bgrRes, bgrMask);
 		BGRDExtractor::backgroundPropagation(bgrRes, bgrInpainted, bgrMask);
-		AlphaBlend::ExtractDominantColors(bgrInpainted, bgrSelectedColors);
+		//AlphaBlend::ExtractDominantColors(bgrInpainted, bgrSelectedColors);
 		AlphaBlend::ExtractDominantColors(foreground, fgrdSelectedColors);
+		fgrdSelectedColors /= 255;
+		bgrInpainted.convertTo(bgrInpainted, CV_32FC3);
+		bgrInpainted /= 255;
 	}
 
 	cv::Mat alpha = cv::Mat::zeros(cv::Size(frame.cols, frame.rows), CV_32FC3);
@@ -150,9 +153,10 @@ void ExtractBackground()
 	cv::Mat fltInput;
 	frame.convertTo(fltInput, CV_32FC3);
 	cv::Mat fgrdUnknownColors = cv::Mat::zeros(frame.size(), CV_32FC3);
+	if (!bgrInpainted.empty())
 	{
-		Timer t("alphablend");
-		AlphaBlend::computeAlpha(fltInput / 255, fgrdSelectedColors / 255, bgrSelectedColors / 255,
+		//Timer t("alphablend");
+		AlphaBlend::computeAlpha(fltInput / 255, fgrdSelectedColors, bgrInpainted,
 			bgrMask, fgrdMask, alpha, fgrdUnknownColors);
 	}
 	fgrdUnknownColors *= 255;

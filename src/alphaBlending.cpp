@@ -96,10 +96,11 @@ float ComputeRd(float C, float B, float F, float alpha)
 
 
 void AlphaBlend::computeAlpha(const cv::Mat& img, const cv::Mat& frgdSelectedColors, const cv::Mat& brgdSelectedColors,
-	const cv::Mat& bgrdMask, const cv::Mat& fgrdMask , cv::Mat& alpha, cv::Mat& foregroundSamples)
+	const cv::Mat& bgrdMask, const cv::Mat& fgrdMask, cv::Mat& alpha, cv::Mat& foregroundSamples)
 {
-	cv::Mat linCost(frgdSelectedColors.rows, brgdSelectedColors.rows, CV_32F);
-	cv::Mat alphas(frgdSelectedColors.rows, brgdSelectedColors.rows, CV_32FC3);
+	auto tmp = Tool::type2str(brgdSelectedColors.type());
+	cv::Mat linCost(frgdSelectedColors.rows, 1, CV_32F);
+	cv::Mat alphas(frgdSelectedColors.rows, 1, CV_32FC3);
 	cv::Point minLoc;
 	double minVal;
 	Timer t("for loop");
@@ -107,6 +108,7 @@ void AlphaBlend::computeAlpha(const cv::Mat& img, const cv::Mat& frgdSelectedCol
 	{
 		const cv::Vec3f* MI = img.ptr<cv::Vec3f>(j);
 		cv::Vec3f * MA = alpha.ptr<cv::Vec3f>(j);
+		const cv::Vec3f* MB = brgdSelectedColors.ptr<cv::Vec3f>(j);
 		const uchar* MFk = fgrdMask.ptr<uchar>(j);
 		const uchar* MBk = bgrdMask.ptr<uchar>(j);
 		for (int i = 0; i < img.cols; i++)
@@ -119,28 +121,24 @@ void AlphaBlend::computeAlpha(const cv::Mat& img, const cv::Mat& frgdSelectedCol
 			{
 				for (int m = 0; m < linCost.rows; ++m)
 				{
-					for (int n = 0; n < linCost.cols; ++n)
+					const cv::Vec3f MF = frgdSelectedColors.ptr<cv::Vec3f>(m)[0];
+					/*cv::Vec3f alpha = cv::Vec3f(computePixelAlpha(MI[i][0], MB[0], MF[0]),
+						computePixelAlpha(MI[i][1], MB[1], MF[1]),
+						computePixelAlpha(MI[i][2], MB[2], MF[2]));*/
+					float tmp = FLT_MAX;
+					//auto test = computePixelAlpha2(cv::Vec3f(0.5, 0, 0), cv::Vec3f(0.9, 0, 0), cv::Vec3f(1, 0, 0));
+					cv::Vec3f tmpAlpha = computePixelAlpha2(MI[i], MB[i], MF);
+					if (tmpAlpha[0] >= 0 && tmpAlpha[1] >= 0 && tmpAlpha[2] >= 0)
 					{
-						const cv::Vec3f MF = frgdSelectedColors.ptr<cv::Vec3f>(m)[0];
-						const cv::Vec3f MB = brgdSelectedColors.ptr<cv::Vec3f>(n)[0];
-						/*cv::Vec3f alpha = cv::Vec3f(computePixelAlpha(MI[i][0], MB[0], MF[0]),
-							computePixelAlpha(MI[i][1], MB[1], MF[1]),
-							computePixelAlpha(MI[i][2], MB[2], MF[2]));*/
-						float tmp = FLT_MAX;
-						//auto test = computePixelAlpha2(cv::Vec3f(0.5, 0, 0), cv::Vec3f(0.9, 0, 0), cv::Vec3f(1, 0, 0));
-						cv::Vec3f tmpAlpha = computePixelAlpha2(MI[i], MB, MF);
-						if (tmpAlpha[0] >= 0 && tmpAlpha[1] >= 0 && tmpAlpha[2] >= 0)
-						{
-							float best = std::max(std::max(tmpAlpha[0], tmpAlpha[1]), tmpAlpha[2]);
-							tmpAlpha = cv::Vec3f(best, best, best);
-							tmp = ComputeRd2(MI[i], MB, MF, tmpAlpha);
-						}
-						linCost.ptr<float>(m)[n] = tmp;
-						/*linCost.ptr<float>(m)[n] = (ComputeRd(MI[i][0], MB[0], MF[0], alpha[0])
-							+ ComputeRd(MI[i][1], MB[1], MF[1], alpha[1])
-							+ ComputeRd(MI[i][2], MB[2], MF[2], alpha[2]) / 3);*/
-						alphas.ptr<cv::Vec3f>(m)[n] = tmpAlpha;
+						float best = std::max(std::max(tmpAlpha[0], tmpAlpha[1]), tmpAlpha[2]);
+						tmpAlpha = cv::Vec3f(best, best, best);
+						tmp = ComputeRd2(MI[i], MB[i], MF, tmpAlpha);
 					}
+					linCost.ptr<float>(m)[0] = tmp;
+					/*linCost.ptr<float>(m)[n] = (ComputeRd(MI[i][0], MB[0], MF[0], alpha[0])
+						+ ComputeRd(MI[i][1], MB[1], MF[1], alpha[1])
+						+ ComputeRd(MI[i][2], MB[2], MF[2], alpha[2]) / 3);*/
+					alphas.ptr<cv::Vec3f>(m)[0] = tmpAlpha;
 				}
 				cv::minMaxLoc(linCost, &minVal, nullptr, &minLoc, nullptr);
 				cv::Vec3f finalAlpha = alphas.ptr<cv::Vec3f>(minLoc.y)[minLoc.x];
