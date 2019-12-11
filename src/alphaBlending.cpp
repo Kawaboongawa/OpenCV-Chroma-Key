@@ -102,6 +102,7 @@ void AlphaBlend::computeAlpha(const cv::Mat& img, const cv::Mat& frgdSelectedCol
 	cv::Mat alphas(frgdSelectedColors.rows, brgdSelectedColors.rows, CV_32FC3);
 	cv::Point minLoc;
 	double minVal;
+	Timer t("for loop");
 	for (int j = 0; j < img.rows; j++)
 	{
 		const cv::Vec3f* MI = img.ptr<cv::Vec3f>(j);

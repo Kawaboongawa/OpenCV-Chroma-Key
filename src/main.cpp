@@ -134,26 +134,27 @@ void ExtractBackground()
 	FRGDExtractor::greenSpillReduction(foreground);
 	
 	cv::Mat bgrMask = masks[0] & masks[1] & masks[2];
-	cv::Mat fgrMask = cv::Mat::zeros(cv::Size(frame.cols, frame.rows), CV_8UC1);;
-	cv::Mat unknownMask = (1 - bgrMask) & (1 - fgrMask);
-	Tool::MaskFromImage(foreground, fgrMask);
-	frame.copyTo(bgrRes, bgrMask);
-	BGRDExtractor::backgroundPropagation(bgrRes, bgrInpainted, bgrMask);
-	
-	cv::Mat alpha = cv::Mat::zeros(cv::Size(frame.cols, frame.rows), CV_32FC3);
-	cv::Mat bgrfloat, fgrdfloat;	
+
+
+	if (bgrSelectedColors.empty())
 	{
-		Timer t("colorExtraction");
-		if (bgrSelectedColors.empty())
-			AlphaBlend::ExtractDominantColors(bgrInpainted, bgrSelectedColors);
-		if (fgrdSelectedColors.empty())
-			AlphaBlend::ExtractDominantColors(foreground, fgrdSelectedColors);
+		frame.copyTo(bgrRes, bgrMask);
+		BGRDExtractor::backgroundPropagation(bgrRes, bgrInpainted, bgrMask);
+		AlphaBlend::ExtractDominantColors(bgrInpainted, bgrSelectedColors);
+		AlphaBlend::ExtractDominantColors(foreground, fgrdSelectedColors);
 	}
+
+	cv::Mat alpha = cv::Mat::zeros(cv::Size(frame.cols, frame.rows), CV_32FC3);
+	cv::Mat bgrfloat, fgrdfloat;
+
 	cv::Mat fltInput;
 	frame.convertTo(fltInput, CV_32FC3);
 	cv::Mat fgrdUnknownColors = cv::Mat::zeros(frame.size(), CV_32FC3);
-	AlphaBlend::computeAlpha(fltInput / 255, fgrdSelectedColors / 255, bgrSelectedColors / 255,
-		bgrMask, fgrdMask, alpha, fgrdUnknownColors);
+	{
+		Timer t("alphablend");
+		AlphaBlend::computeAlpha(fltInput / 255, fgrdSelectedColors / 255, bgrSelectedColors / 255,
+			bgrMask, fgrdMask, alpha, fgrdUnknownColors);
+	}
 	fgrdUnknownColors *= 255;
 	fgrdUnknownColors.convertTo(fgrdUnknownColors, CV_8UC3);
 	foreground += fgrdUnknownColors;
