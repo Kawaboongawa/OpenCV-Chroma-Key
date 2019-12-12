@@ -1,14 +1,14 @@
 #include "alphaBlending.h"
 #include <limits>
 
+
 void AlphaBlend::alphaBlend(cv::Mat& foreground, cv::Mat& background, cv::Mat& alpha, cv::Mat& outImage)
 {
+	auto f = [&](float F, float B, float A)
+	{
+		return (A * F) + (1 - A) * B;
+	};
 
-	// Get floating point pointers to the data matrices
-	/*float* fptr = reinterpret_cast<float*>(foreground.data);
-	float* bptr = reinterpret_cast<float*>(background.data);
-	float* aptr = reinterpret_cast<float*>(alpha.data);
-	float* outImagePtr = reinterpret_cast<float*>(outImage.data);*/
 	for (int j = 0; j < foreground.rows; j++)
 	{
 		const cv::Vec3b * MF = foreground.ptr<cv::Vec3b>(j);
@@ -17,10 +17,6 @@ void AlphaBlend::alphaBlend(cv::Mat& foreground, cv::Mat& background, cv::Mat& a
 		cv::Vec3b * MO = outImage.ptr<cv::Vec3b>(j);
 		for (int i = 0; i < foreground.cols; i++)
 		{
-			auto f = [&](float F, float B, float A)
-			{
-				return (A * F) + (1 - A) * B;
-			};
 			MO[i] = cv::Vec3b(f(MF[i][0], MB[i][0], MA[i][0]),
 				f(MF[i][1], MB[i][1], MA[i][1]),
 				f(MF[i][2], MB[i][2], MA[i][2]));
@@ -41,20 +37,6 @@ void AlphaBlend::ExtractDominantColors(const cv::Mat& mat, cv::Mat& centers, int
 		3, cv::KMEANS_PP_CENTERS, centers);
 	auto tmp = Tool::type2str(centers.type());
 	centers.reshape(3, nClusters);
-	/*int* tmp = labels.ptr<int>(0);
-	auto str = Tool::type2str(centers.type());
-	float* tmp2 = centers.ptr<float>(0);
-	mat *= 0;
-	cv::Point3f point = centers.ptr<cv::Point3f>(3)[0];
-	cv::Vec3b result = cv::Vec3b(point.x, point.y, point.z);
-	mat += result;*/
-}
-
-float computePixelAlpha(float C, float B, float F)
-{
-	if (F < 0.1f && B < 0.1f)
-		return 0;
-	return (abs((C - B) * (F - B))) / pow(F - B, 2);
 }
 
 float mag(const cv::Vec3f& vec)
@@ -63,7 +45,7 @@ float mag(const cv::Vec3f& vec)
 }
 
 
-cv::Vec3f computePixelAlpha2(const cv::Vec3f& C, const cv::Vec3f& B, const cv::Vec3f& F)
+cv::Vec3f computePixelAlpha(const cv::Vec3f& C, const cv::Vec3f& B, const cv::Vec3f& F)
 {
 
 	cv::Vec3f vec = F - B;
@@ -77,7 +59,7 @@ cv::Vec3f computePixelAlpha2(const cv::Vec3f& C, const cv::Vec3f& B, const cv::V
 }
 
 
-float ComputeRd2(const cv::Vec3f& C, const cv::Vec3f& B, const cv::Vec3f& F, const cv::Vec3f& alpha)
+float ComputeRd(const cv::Vec3f& C, const cv::Vec3f& B, const cv::Vec3f& F, const cv::Vec3f& alpha)
 {
 	cv::Vec3f alphaDiff = cv::Vec3f(1 - alpha[0], 1 - alpha[1], 1 - alpha[2]);
 	cv::Vec3f bgrd, fgrd;
@@ -89,12 +71,6 @@ float ComputeRd2(const cv::Vec3f& C, const cv::Vec3f& B, const cv::Vec3f& F, con
 	return num / div;
 }
 
-float ComputeRd(float C, float B, float F, float alpha)
-{
-	return abs(C - (alpha * F + (1 - alpha) * B)) / std::max<float>(0.01, abs(F - B));
-}
-
-
 void AlphaBlend::computeAlpha(const cv::Mat& img, const cv::Mat& frgdSelectedColors, const cv::Mat& brgdSelectedColors,
 	const cv::Mat& bgrdMask, const cv::Mat& fgrdMask, cv::Mat& alpha, cv::Mat& foregroundSamples)
 {
@@ -103,7 +79,6 @@ void AlphaBlend::computeAlpha(const cv::Mat& img, const cv::Mat& frgdSelectedCol
 	cv::Mat alphas(frgdSelectedColors.rows, 1, CV_32FC3);
 	cv::Point minLoc;
 	double minVal;
-	Timer t("for loop");
 	for (int j = 0; j < img.rows; j++)
 	{
 		const cv::Vec3f* MI = img.ptr<cv::Vec3f>(j);
@@ -122,22 +97,15 @@ void AlphaBlend::computeAlpha(const cv::Mat& img, const cv::Mat& frgdSelectedCol
 				for (int m = 0; m < linCost.rows; ++m)
 				{
 					const cv::Vec3f MF = frgdSelectedColors.ptr<cv::Vec3f>(m)[0];
-					/*cv::Vec3f alpha = cv::Vec3f(computePixelAlpha(MI[i][0], MB[0], MF[0]),
-						computePixelAlpha(MI[i][1], MB[1], MF[1]),
-						computePixelAlpha(MI[i][2], MB[2], MF[2]));*/
 					float tmp = FLT_MAX;
-					//auto test = computePixelAlpha2(cv::Vec3f(0.5, 0, 0), cv::Vec3f(0.9, 0, 0), cv::Vec3f(1, 0, 0));
-					cv::Vec3f tmpAlpha = computePixelAlpha2(MI[i], MB[i], MF);
+					cv::Vec3f tmpAlpha = computePixelAlpha(MI[i], MB[i], MF);
+					float best = std::max(std::max(tmpAlpha[0], tmpAlpha[1]), tmpAlpha[2]);
+					tmpAlpha = cv::Vec3f(best, best, best);
 					if (tmpAlpha[0] >= 0 && tmpAlpha[1] >= 0 && tmpAlpha[2] >= 0)
 					{
-						float best = std::max(std::max(tmpAlpha[0], tmpAlpha[1]), tmpAlpha[2]);
-						tmpAlpha = cv::Vec3f(best, best, best);
-						tmp = ComputeRd2(MI[i], MB[i], MF, tmpAlpha);
+						tmp = ComputeRd(MI[i], MB[i], MF, tmpAlpha);
 					}
 					linCost.ptr<float>(m)[0] = tmp;
-					/*linCost.ptr<float>(m)[n] = (ComputeRd(MI[i][0], MB[0], MF[0], alpha[0])
-						+ ComputeRd(MI[i][1], MB[1], MF[1], alpha[1])
-						+ ComputeRd(MI[i][2], MB[2], MF[2], alpha[2]) / 3);*/
 					alphas.ptr<cv::Vec3f>(m)[0] = tmpAlpha;
 				}
 				cv::minMaxLoc(linCost, &minVal, nullptr, &minLoc, nullptr);

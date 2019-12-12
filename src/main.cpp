@@ -8,7 +8,7 @@ using namespace std;
 
 typedef unsigned int uint;
 
-std::string background_path = "../data/images/background2.jpg";
+std::string background_path = "../data/images/backgroundTest2.jpg";
 std::string video_path = "../data/greenscreen2.mp4";
 
 std::string windowName = "Chroma-keying";
@@ -89,7 +89,7 @@ void setColor(int x, int y)
 	
 }
 
-void ExtractBackground()
+void applyChroma()
 {
 	cv::Mat hsvForeground, fgrdRes, bgrRes;
 	cv::cvtColor(frame, hsvForeground, cv::COLOR_BGR2HSV);
@@ -113,7 +113,6 @@ void ExtractBackground()
 	** Extract Absolute Foreground
 	*/
 	cv::Mat bgrdMask = cv::Mat::zeros(cv::Size(frame.cols, frame.rows), CV_8UC1);
-	//bgrdMask = masks[0] & masks[1] & masks[2];
 	cv::Mat fgrdMask = cv::Mat::zeros(cv::Size(frame.cols, frame.rows), CV_8UC1);
 	FRGDExtractor::getHUEMask(foregroundHsvChannels[0], fgrdMask, ranges[0], ceil((static_cast<float>(tolerance) / 4) / 100 * 180));
 
@@ -141,7 +140,7 @@ void ExtractBackground()
 		frame.copyTo(bgrRes, bgrMask);
 		BGRDExtractor::backgroundPropagation(bgrRes, bgrInpainted, bgrMask);
 		//AlphaBlend::ExtractDominantColors(bgrInpainted, bgrSelectedColors);
-		AlphaBlend::ExtractDominantColors(foreground, fgrdSelectedColors);
+		AlphaBlend::ExtractDominantColors(foreground, fgrdSelectedColors, 10);
 		fgrdSelectedColors /= 255;
 		bgrInpainted.convertTo(bgrInpainted, CV_32FC3);
 		bgrInpainted /= 255;
@@ -153,24 +152,22 @@ void ExtractBackground()
 	cv::Mat fltInput;
 	frame.convertTo(fltInput, CV_32FC3);
 	cv::Mat fgrdUnknownColors = cv::Mat::zeros(frame.size(), CV_32FC3);
-	if (!bgrInpainted.empty())
-	{
 		//Timer t("alphablend");
+	{
+		Timer t("alphablend");
 		AlphaBlend::computeAlpha(fltInput / 255, fgrdSelectedColors, bgrInpainted,
 			bgrMask, fgrdMask, alpha, fgrdUnknownColors);
 	}
-	fgrdUnknownColors *= 255;
-	fgrdUnknownColors.convertTo(fgrdUnknownColors, CV_8UC3);
-	foreground += fgrdUnknownColors;
-	AlphaBlend::alphaBlend(foreground, background, alpha, resultImage);
+	{
+		Timer t("conversion finale");
+		fgrdUnknownColors *= 255;
+		fgrdUnknownColors.convertTo(fgrdUnknownColors, CV_8UC3);
+		foreground += fgrdUnknownColors;
+		AlphaBlend::alphaBlend(foreground, background, alpha, resultImage);
+	}
 }
 
 
-void apply_softness()
-{
-	//int kernelSize = (Softness / 5) % 2 == 0 ? (Softness / 5) + 1 : Softness / 5;
-	///GaussianBlur(resultForeground, resultForeground, cv::Size(kernelSize, kernelSize), 1);
-}
 
 // function which will be called on mouse input
 void removeBlemish(int action, int x, int y, int flags, void *userdata)
@@ -180,25 +177,17 @@ void removeBlemish(int action, int x, int y, int flags, void *userdata)
 		vidStarted = true;
 
 	// Action to be taken when left mouse button is pressed
-	if (action == EVENT_RBUTTONDOWN)
+	if (action == EVENT_RBUTTONDOWN && !colorSelected)
 		setColor(x, y);
 
 }
 
 void ValueModified(int, void*)
 {
-	ExtractBackground();
+	if (colorSelected)
+		applyChroma();
 }
 
-
-void applyChroma()
-{
-	ExtractBackground();
-	//apply_softness();
-	//cv::add(resultBackground, resultForeground, resultImage);
-	//seamlessClone(background, foreground, mask, center, resultImage, MIXED_CLONE);
-	//foreground.convertTo()
-}
 
 int main(int argc, char** argv)
 {
@@ -207,9 +196,9 @@ int main(int argc, char** argv)
 	background = imread(background_path);
 	FRGDExtractor::createSaturationThreshMap();
 	//cv::Mat hsvForeground, test2, foreResult;
-	//cv::Mat test = imread("../data/images/test2.png");
-	//resultImage = test.clone();
-	//frame = test.clone();
+	cv::Mat test = imread("../data/images/test2.png");
+	resultImage = test.clone();
+	frame = test.clone();
 	//background = imread("../data/images/green.png");
 	//background.convertTo(background, CV_32FC3);
 	// Make a dummy image, will be useful to clear the drawing
@@ -241,8 +230,8 @@ int main(int argc, char** argv)
 		// Capture frame-by-frame
 		if (vidStarted || frame.empty())
 		{
-			cap >> frame;
-			frame.copyTo(resultImage);
+			//cap >> frame;
+			//frame.copyTo(resultImage);
 		}
 
 		// If the frame is empty, break immediately
