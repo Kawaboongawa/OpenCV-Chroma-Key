@@ -30,6 +30,7 @@ namespace Tool
 	void drawHist(cv::Mat hist, int histSize);
 	std::string type2str(int type);
 	void MaskFromImage(const cv::Mat& input, cv::Mat& output);
+	std::vector<std::pair<int, int>> generateArrays(int size);
 }
 
 class Timer

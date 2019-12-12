@@ -54,6 +54,7 @@ cv::Vec3f computePixelAlpha(const cv::Vec3f& C, const cv::Vec3f& B, const cv::Ve
 		return cv::Vec3f(0, 0, 0);
 	cv::Vec3f res;
 	cv::multiply(C - B, vec, res);
+	res = cv::Vec3f(abs(res[0]), abs(res[1]), abs(res[2]));
 	res /= mag;
 	return res;
 }
@@ -74,7 +75,6 @@ float ComputeRd(const cv::Vec3f& C, const cv::Vec3f& B, const cv::Vec3f& F, cons
 void AlphaBlend::computeAlpha(const cv::Mat& img, const cv::Mat& frgdSelectedColors, const cv::Mat& brgdSelectedColors,
 	const cv::Mat& bgrdMask, const cv::Mat& fgrdMask, cv::Mat& alpha, cv::Mat& foregroundSamples)
 {
-	auto tmp = Tool::type2str(brgdSelectedColors.type());
 	cv::Mat linCost(frgdSelectedColors.rows, 1, CV_32F);
 	cv::Mat alphas(frgdSelectedColors.rows, 1, CV_32FC3);
 	cv::Point minLoc;
@@ -101,10 +101,7 @@ void AlphaBlend::computeAlpha(const cv::Mat& img, const cv::Mat& frgdSelectedCol
 					cv::Vec3f tmpAlpha = computePixelAlpha(MI[i], MB[i], MF);
 					float best = std::max(std::max(tmpAlpha[0], tmpAlpha[1]), tmpAlpha[2]);
 					tmpAlpha = cv::Vec3f(best, best, best);
-					if (tmpAlpha[0] >= 0 && tmpAlpha[1] >= 0 && tmpAlpha[2] >= 0)
-					{
-						tmp = ComputeRd(MI[i], MB[i], MF, tmpAlpha);
-					}
+					tmp = ComputeRd(MI[i], MB[i], MF, tmpAlpha);
 					linCost.ptr<float>(m)[0] = tmp;
 					alphas.ptr<cv::Vec3f>(m)[0] = tmpAlpha;
 				}
@@ -112,6 +109,27 @@ void AlphaBlend::computeAlpha(const cv::Mat& img, const cv::Mat& frgdSelectedCol
 				cv::Vec3f finalAlpha = alphas.ptr<cv::Vec3f>(minLoc.y)[minLoc.x];
 				MA[i] = finalAlpha;
 				foregroundSamples.ptr<cv::Vec3f>(j)[i] = frgdSelectedColors.ptr<cv::Vec3f>(minLoc.y)[0];
+			}
+		}
+	}
+}
+
+
+void knownRegionExpansion(const cv::Mat& img, cv::Mat& fgrdMask, cv::Mat& bgrdMask, cv::Mat& unknownMask, int ki, int kc)
+{
+	for (int j = 0; j < img.rows; j++)
+	{
+		const cv::Vec3f* MI = img.ptr<cv::Vec3f>(j);
+		const uchar* MF = fgrdMask.ptr<uchar>(j);
+		const uchar* MB = bgrdMask.ptr<uchar>(j);
+		const uchar* MU = unknownMask.ptr<uchar>(j);
+
+		for (uint i = 0; i < img.cols; i++)
+		{
+			if (MU[i])
+			{
+				
+
 			}
 		}
 	}

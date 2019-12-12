@@ -8,8 +8,8 @@ using namespace std;
 
 typedef unsigned int uint;
 
-std::string background_path = "../data/images/backgroundTest2.jpg";
-std::string video_path = "../data/greenscreen2.mp4";
+std::string background_path = "../data/images/background1.jpg";
+std::string video_path = "../data/greenscreen1.mp4";
 
 std::string windowName = "Chroma-keying";
 cv::Vec3i rgb;
@@ -191,14 +191,14 @@ void ValueModified(int, void*)
 
 int main(int argc, char** argv)
 {
-
-	// Read image
+	auto tmp = Tool::generateArrays(4);
+	// R"ad image
 	background = imread(background_path);
 	FRGDExtractor::createSaturationThreshMap();
 	//cv::Mat hsvForeground, test2, foreResult;
-	cv::Mat test = imread("../data/images/test2.png");
-	resultImage = test.clone();
-	frame = test.clone();
+	//cv::Mat test = imread("../data/images/test2.png");
+	//resultImage = test.clone();
+	//frame = test.clone();
 	//background = imread("../data/images/green.png");
 	//background.convertTo(background, CV_32FC3);
 	// Make a dummy image, will be useful to clear the drawing
@@ -230,8 +230,8 @@ int main(int argc, char** argv)
 		// Capture frame-by-frame
 		if (vidStarted || frame.empty())
 		{
-			//cap >> frame;
-			//frame.copyTo(resultImage);
+			cap >> frame;
+			frame.copyTo(resultImage);
 		}
 
 		// If the frame is empty, break immediately

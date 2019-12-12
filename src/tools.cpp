@@ -54,6 +54,29 @@ void Tool::MaskFromImage(const cv::Mat& input, cv::Mat& output)
 	}
 }
 
+float dist(float x1, float x2, float y1, float y2)
+{
+	return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
+}
+
+std::vector<std::pair<int, int>> Tool::generateArrays(int size)
+{
+	std::vector<std::pair<int, int>> vec;
+	for (int n = 0; n < size; ++n)
+	{
+		for (int i = 0; i <= n; ++i)
+		{
+			for (int u = 0; u < 2; ++u)
+			{
+				vec.push_back(std::make_pair((n  - i) * pow(-1, (u) % 2), ((size - n) * pow(-1, (u % 2)))));
+				vec.push_back(std::make_pair((size - n) * pow(-1, (u + 1) % 2), (n - i) * pow(-1, (u % 2))));
+			}
+		}
+	}
+	std::sort(vec.begin(), vec.end(), [](std::pair<int, int> a, std::pair<int, int> b) { return dist(0, a.first, 0, a.second) < dist(0, b.first, 0, b.second); });
+	return vec;
+}
+
 Timer::Timer(std::string str)
 : m_str(str)
 {

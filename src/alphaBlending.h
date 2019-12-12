@@ -9,4 +9,5 @@ namespace AlphaBlend
 	void ExtractDominantColors(const cv::Mat& mat, cv::Mat& centers, int nClusters = 10);
 	void computeAlpha(const cv::Mat& img, const cv::Mat& frgdSelectedColors, const cv::Mat& brgdSelectedColors,
 		const cv::Mat& bgrdMask, const cv::Mat& fgrdMask, cv::Mat& alpha, cv::Mat& foregroundSamples);
+	void knownRegionExpansion(const cv::Mat& img, cv::Mat& fgrdMask, cv::Mat& bgrdMask, int ki, int kc);
 }
