@@ -51,6 +51,20 @@ void FRGDExtractor::extractColorlessForground(const cv::Mat& input, cv::Mat& out
 	}
 }
 
+void FRGDExtractor::extractColorlessForgroundMask(cv::Mat& mask, const cv::Mat& GC, uchar T)
+{
+	for (int j = 0; j < mask.rows; j++)
+	{
+		uchar * MI = mask.ptr<uchar>(j);
+		const uchar* MGC = GC.ptr<uchar>(j);
+		for (int i = 0; i < mask.cols; i++)
+		{
+			if (MGC[i] >= T)
+				MI[i] = 1;
+		}
+	}
+}
+
 void FRGDExtractor::greenSpillReduction(cv::Mat& mat)
 {
 	for (int j = 0; j < mat.rows; j++)

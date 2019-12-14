@@ -115,21 +115,40 @@ void AlphaBlend::computeAlpha(const cv::Mat& img, const cv::Mat& frgdSelectedCol
 }
 
 
-void knownRegionExpansion(const cv::Mat& img, cv::Mat& fgrdMask, cv::Mat& bgrdMask, cv::Mat& unknownMask, int ki, int kc)
+float euclideanDist(cv::Vec3f a, cv::Vec3f b)
+{
+	return sqrt(pow(a[0] - b[0], 2) + pow(a[1] - b[1], 2) + pow(a[2] - b[2], 2));
+}
+
+void AlphaBlend::knownRegionExpansion(const cv::Mat& img, const cv::Mat& unknowMask, cv::Mat& fgrdMask, cv::Mat& bgrdMask, float kc, const std::vector<std::pair<int, int>>& pos)
 {
 	for (int j = 0; j < img.rows; j++)
 	{
-		const cv::Vec3f* MI = img.ptr<cv::Vec3f>(j);
-		const uchar* MF = fgrdMask.ptr<uchar>(j);
-		const uchar* MB = bgrdMask.ptr<uchar>(j);
-		const uchar* MU = unknownMask.ptr<uchar>(j);
+		const cv::Vec3b* MI = img.ptr<cv::Vec3b>(j);
+		uchar* MF = fgrdMask.ptr<uchar>(j);
+		uchar* MB = bgrdMask.ptr<uchar>(j);
+		const uchar* MU = unknowMask.ptr<uchar>(j);
 
-		for (uint i = 0; i < img.cols; i++)
+		for (int i = 0; i < img.cols; i++)
 		{
-			if (MU[i])
+			if (!MF[i] && !MB[i])
 			{
-				
+				for (auto e : pos)
+				{
+					int y = std::max(0, std::min(j + e.first, img.rows - 1));
+					int x = std::max(0, std::min(i + e.second, img.cols - 1));
+					if (unknowMask.ptr<uchar>(y)[x] == 1)
+						continue;
+					float dist = euclideanDist(MI[i], img.ptr<cv::Vec3b>(y)[x]) / 3;
+					if (dist <= kc)
+					{
+						if (fgrdMask.ptr<uchar>(y)[x] == 1)
+							MF[i] = 1;
+						else
+							MB[i] = 1;
+					}
 
+				}
 			}
 		}
 	}

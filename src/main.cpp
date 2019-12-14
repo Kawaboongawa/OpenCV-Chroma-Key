@@ -8,8 +8,8 @@ using namespace std;
 
 typedef unsigned int uint;
 
-std::string background_path = "../data/images/background1.jpg";
-std::string video_path = "../data/greenscreen1.mp4";
+std::string background_path = "../data/images/bgrd/background2.jpg";
+std::string video_path = "../data/greenscreen2.mp4";
 
 std::string windowName = "Chroma-keying";
 cv::Vec3i rgb;
@@ -24,7 +24,7 @@ const uint alpha = 0;
 float2 ranges[3];
 cv::Mat masks[3];
 cv::Mat background, foreground, frame, resultImage, bgrSelectedColors, fgrdSelectedColors, bgrInpainted;
-
+std::vector<std::pair<int, int>> pos;
 
 
 void ComputeHSVRange()
@@ -112,35 +112,48 @@ void applyChroma()
 	/*
 	** Extract Absolute Foreground
 	*/
-	cv::Mat bgrdMask = cv::Mat::zeros(cv::Size(frame.cols, frame.rows), CV_8UC1);
+	cv::Mat bgrdMask = masks[0] & masks[1] & masks[2];
 	cv::Mat fgrdMask = cv::Mat::zeros(cv::Size(frame.cols, frame.rows), CV_8UC1);
-	FRGDExtractor::getHUEMask(foregroundHsvChannels[0], fgrdMask, ranges[0], ceil((static_cast<float>(tolerance) / 4) / 100 * 180));
+	FRGDExtractor::getHUEMask(foregroundHsvChannels[0], fgrdMask, ranges[0], ceil((static_cast<float>(tolerance) / 2) / 100 * 180));
 
 	/*
 	** Extract Reflective region
 	*/
 	cv::Mat grayConfidence = cv::Mat::zeros(cv::Size(frame.cols, frame.rows), CV_8U);
 	FRGDExtractor::computeGrayConfidence(grayConfidence, foregroundHsvChannels[1], foregroundHsvChannels[2]);
-	cv::Mat colorlessForeground = cv::Mat::zeros(cv::Size(frame.cols, frame.rows), CV_8UC3);
-	FRGDExtractor::extractColorlessForground(frame, colorlessForeground, grayConfidence, 13);
-
-
+	//cv::Mat colorlessForeground = cv::Mat::zeros(cv::Size(frame.cols, frame.rows), CV_8UC3);
+	//FRGDExtractor::extractColorlessForground(frame, colorlessForeground, grayConfidence, 13);
+	cv::Mat colorlessForegroundMask = cv::Mat::zeros(cv::Size(frame.cols, frame.rows), CV_8U);
+	FRGDExtractor::extractColorlessForgroundMask(colorlessForegroundMask, grayConfidence, 13);
+	//frame.convertTo(frame, CV_32FC3);
+	//cv::imshow("before", fgrdMask * 255);
+	fgrdMask |= colorlessForegroundMask;
+	//cv::imshow("before", fgrdMask * 255);
+	{
+		//Timer t("knowregion");
+		//AlphaBlend::knownRegionExpansion(frame, 1 - (fgrdMask + bgrdMask), fgrdMask, bgrdMask, 5.f, pos);
+	}
+	/*cv::imshow("after", fgrdMask * 255);
+	cv::waitKey();*/
+	//resultImage = (grayConfidence | fgrdMask) * 255;
+	
+	//exit(0);
 	/*
 	** Apply masks
 	*/
-	frame.copyTo(fgrdRes, fgrdMask);
-	foreground = fgrdRes | colorlessForeground;
+	//frame.copyTo(fgrdRes, fgrdMask);
+	foreground.setTo(0);
+	frame.copyTo(foreground, fgrdMask);
 	FRGDExtractor::greenSpillReduction(foreground);
 	
-	cv::Mat bgrMask = masks[0] & masks[1] & masks[2];
 
 
 	if (fgrdSelectedColors.empty())
 	{
-		frame.copyTo(bgrRes, bgrMask);
-		BGRDExtractor::backgroundPropagation(bgrRes, bgrInpainted, bgrMask);
+		frame.copyTo(bgrRes, bgrdMask);
+		BGRDExtractor::backgroundPropagation(bgrRes, bgrInpainted, bgrdMask);
 		//AlphaBlend::ExtractDominantColors(bgrInpainted, bgrSelectedColors);
-		AlphaBlend::ExtractDominantColors(foreground, fgrdSelectedColors, 10);
+		AlphaBlend::ExtractDominantColors(foreground, fgrdSelectedColors, 5);
 		fgrdSelectedColors /= 255;
 		bgrInpainted.convertTo(bgrInpainted, CV_32FC3);
 		bgrInpainted /= 255;
@@ -156,13 +169,15 @@ void applyChroma()
 	{
 		Timer t("alphablend");
 		AlphaBlend::computeAlpha(fltInput / 255, fgrdSelectedColors, bgrInpainted,
-			bgrMask, fgrdMask, alpha, fgrdUnknownColors);
+			bgrdMask, fgrdMask, alpha, fgrdUnknownColors);
 	}
 	{
 		Timer t("conversion finale");
 		fgrdUnknownColors *= 255;
 		fgrdUnknownColors.convertTo(fgrdUnknownColors, CV_8UC3);
+
 		foreground += fgrdUnknownColors;
+
 		AlphaBlend::alphaBlend(foreground, background, alpha, resultImage);
 	}
 }
@@ -189,33 +204,36 @@ void ValueModified(int, void*)
 }
 
 
+void extendBackground(const cv::Mat& img, cv::Mat& bgr)
+{
+	if (bgr.empty())
+	{
+		bgr = cv::Mat::zeros(img.size(), img.type());
+		bgr += 100;
+	}
+	else
+		cv::resize(bgr, bgr, img.size());
+}
+
 int main(int argc, char** argv)
 {
-	auto tmp = Tool::generateArrays(4);
-	// R"ad image
+	pos = Tool::generateArrays(10);
 	background = imread(background_path);
 	FRGDExtractor::createSaturationThreshMap();
-	//cv::Mat hsvForeground, test2, foreResult;
-	//cv::Mat test = imread("../data/images/test2.png");
-	//resultImage = test.clone();
-	//frame = test.clone();
-	//background = imread("../data/images/green.png");
-	//background.convertTo(background, CV_32FC3);
-	// Make a dummy image, will be useful to clear the drawing
-	//dummy = source.clone();
+	/*cv::Mat test = imread("../data/images/fgrd/voile.png");
+	resultImage = test.clone();
+	frame = test.clone();
+	extendBackground(test, background);*/
 	namedWindow(windowName, WINDOW_NORMAL);
-	//cv::setWindowProperty(windowName, WND_PROP_FULLSCREEN, WINDOW_FULLSCREEN);
+	resizeWindow(windowName, background.cols, background.rows);
 	// highgui function called when mouse events occur
 	setMouseCallback("Chroma-keying", removeBlemish);
 
 	cv::createTrackbar("Tolerance", windowName, &tolerance, 100, ValueModified);
 
-	cv::createTrackbar("Softness", windowName, &softness, 100, ValueModified);
-
 	// Create a VideoCapture object and open the input file
 	// If the input is the web camera, pass 0 instead of the video file name
 	VideoCapture cap(video_path);
-
 	// Check if camera opened successfully
 	if (!cap.isOpened()) {
 		cout << "Error opening video stream or file" << endl;
