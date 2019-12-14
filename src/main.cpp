@@ -13,14 +13,14 @@ typedef unsigned int uint;
 ** SAMPLE1
 */
 //std::string background_path = "../data/images/bgrd/background1.jpg";
-//std::string video_path = "../data/greenscreen1.mp4";
+//std::string video_path = "../data/videos/greenscreen1.mp4";
 
 /*
 ** SAMPLE2
 */
 
 std::string background_path = "../data/images/bgrd/background2.jpg";
-std::string video_path = "../data/greenscreen2.mp4";
+std::string video_path = "../data/videos/greenscreen2.mp4";
 
 
 std::string windowName = "Chroma-keying";
@@ -221,7 +221,7 @@ int main(int argc, char** argv)
 	pos = Tool::generateArrays(10);
 	background = imread(background_path);
 	FRGDExtractor::createSaturationThreshMap();
-	/*cv::Mat test = imread("../data/images/fgrd/voile.png");
+	/*cv::Mat test = imread("../data/images/fgrd/sample.jpg");
 	resultImage = test.clone();
 	frame = test.clone();
 	extendBackground(test, background);*/
@@ -264,7 +264,6 @@ int main(int argc, char** argv)
 		}
 		// Display the resulting frame
 		imshow("Chroma-keying", resultImage);
-		//imshow("Chroma-keying", resultImage);
 		k = waitKey(20) & 0xFF;
 	}
 
