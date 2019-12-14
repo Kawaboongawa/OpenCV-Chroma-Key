@@ -86,10 +86,4 @@ void FRGDExtractor::createSaturationThreshMap()
 	for (uint i = 0; i < 21; ++i)
 		St.ptr<float>(i)[0] = ThreshSat[i] * 255;
 	cv::resize(St, m_St, cv::Size(1, 256));
-	/*cv::Mat hHist;
-	int histSize = 256;
-	float range[] = { 0, 256 }; //the upper boundary is exclusive
-	const float* histRange = { range };
-	cv::calcHist(&m_St, 1, 0, cv::Mat(), hHist, 1, &histSize, &histRange, true, false);
-	Tool::drawHist(m_St, 256);*/
 }

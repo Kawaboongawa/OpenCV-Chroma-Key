@@ -8,8 +8,20 @@ using namespace std;
 
 typedef unsigned int uint;
 
+
+/*
+** SAMPLE1
+*/
+//std::string background_path = "../data/images/bgrd/background1.jpg";
+//std::string video_path = "../data/greenscreen1.mp4";
+
+/*
+** SAMPLE2
+*/
+
 std::string background_path = "../data/images/bgrd/background2.jpg";
 std::string video_path = "../data/greenscreen2.mp4";
+
 
 std::string windowName = "Chroma-keying";
 cv::Vec3i rgb;
@@ -33,11 +45,10 @@ void ComputeHSVRange()
 	cvtColor(resultImage, imhsv, COLOR_BGR2HSV);
 	std::vector<cv::Mat> imhsvChannels(3);
 	split(imhsv, imhsvChannels);
-	//cv::multiply(imhsvChannels[0], cv::Scalar(1 / 255.f), alpha);
 	cv::Mat hHist;
 	bool uniform = true, accumulate = false;
 	int histSize = 181;
-	float range[] = { 0, 181}; //the upper boundary is exclusive
+	float range[] = { 0, 181 }; //the upper boundary is exclusive
 	const float* histRange = { range };
 
 	for (int i = 0; i < 3; ++i)
@@ -45,11 +56,10 @@ void ComputeHSVRange()
 	/*
 	** Hue
 	*/
-		calcHist(&imhsvChannels[0], 1, 0, Mat(), hHist, 1, &histSize, &histRange, uniform, accumulate);
-		GaussianBlur(hHist, hHist, cv::Size(1, 7), 1);
-		ranges[0] = BGRDExtractor::computeRange(hHist);
-		BGRDExtractor::getMask(imhsvChannels[0], masks[0], ranges[0]);
-	//ranges[0] = float2(50, 60);
+	calcHist(&imhsvChannels[0], 1, 0, Mat(), hHist, 1, &histSize, &histRange, uniform, accumulate);
+	GaussianBlur(hHist, hHist, cv::Size(1, 7), 1);
+	ranges[0] = BGRDExtractor::computeRange(hHist);
+	BGRDExtractor::getMask(imhsvChannels[0], masks[0], ranges[0]);
 	/*
 	** Saturation
 	*/
@@ -61,7 +71,6 @@ void ComputeHSVRange()
 	hHist.ptr<float>(0)[0] = 0;
 	GaussianBlur(hHist, hHist, cv::Size(1, 7), 1);
 	ranges[1] = BGRDExtractor::computeRange(hHist);
-	//BGRDExtractor::getMask(imhsvChannels[1], masks[1], ranges[1]);
 	/*
 	** Value
 	*/
@@ -86,7 +95,7 @@ void setColor(int x, int y)
 	setTrackbarPos("blue", windowName, rgb[2]);
 	ComputeHSVRange();
 	colorSelected = true;
-	
+
 }
 
 void applyChroma()
@@ -121,65 +130,57 @@ void applyChroma()
 	*/
 	cv::Mat grayConfidence = cv::Mat::zeros(cv::Size(frame.cols, frame.rows), CV_8U);
 	FRGDExtractor::computeGrayConfidence(grayConfidence, foregroundHsvChannels[1], foregroundHsvChannels[2]);
-	//cv::Mat colorlessForeground = cv::Mat::zeros(cv::Size(frame.cols, frame.rows), CV_8UC3);
-	//FRGDExtractor::extractColorlessForground(frame, colorlessForeground, grayConfidence, 13);
+
 	cv::Mat colorlessForegroundMask = cv::Mat::zeros(cv::Size(frame.cols, frame.rows), CV_8U);
 	FRGDExtractor::extractColorlessForgroundMask(colorlessForegroundMask, grayConfidence, 13);
-	//frame.convertTo(frame, CV_32FC3);
-	//cv::imshow("before", fgrdMask * 255);
+
 	fgrdMask |= colorlessForegroundMask;
-	//cv::imshow("before", fgrdMask * 255);
-	{
-		//Timer t("knowregion");
-		//AlphaBlend::knownRegionExpansion(frame, 1 - (fgrdMask + bgrdMask), fgrdMask, bgrdMask, 5.f, pos);
-	}
-	/*cv::imshow("after", fgrdMask * 255);
-	cv::waitKey();*/
-	//resultImage = (grayConfidence | fgrdMask) * 255;
-	
-	//exit(0);
-	/*
-	** Apply masks
-	*/
-	//frame.copyTo(fgrdRes, fgrdMask);
+
+	AlphaBlend::knownRegionExpansion(frame, 1 - (fgrdMask + bgrdMask), fgrdMask, bgrdMask, 5.f, pos);
+
 	foreground.setTo(0);
 	frame.copyTo(foreground, fgrdMask);
 	FRGDExtractor::greenSpillReduction(foreground);
-	
 
 
+	/*
+	** Selection of dominant colors and background inpainting (only once)
+	*/
 	if (fgrdSelectedColors.empty())
 	{
 		frame.copyTo(bgrRes, bgrdMask);
 		BGRDExtractor::backgroundPropagation(bgrRes, bgrInpainted, bgrdMask);
-		//AlphaBlend::ExtractDominantColors(bgrInpainted, bgrSelectedColors);
 		AlphaBlend::ExtractDominantColors(foreground, fgrdSelectedColors, 5);
 		fgrdSelectedColors /= 255;
 		bgrInpainted.convertTo(bgrInpainted, CV_32FC3);
 		bgrInpainted /= 255;
 	}
 
+
+	/*
+	** Unknown region alpha matting
+	*/
 	cv::Mat alpha = cv::Mat::zeros(cv::Size(frame.cols, frame.rows), CV_32FC3);
 	cv::Mat bgrfloat, fgrdfloat;
 
 	cv::Mat fltInput;
 	frame.convertTo(fltInput, CV_32FC3);
 	cv::Mat fgrdUnknownColors = cv::Mat::zeros(frame.size(), CV_32FC3);
-		//Timer t("alphablend");
-	{
-		Timer t("alphablend");
-		AlphaBlend::computeAlpha(fltInput / 255, fgrdSelectedColors, bgrInpainted,
-			bgrdMask, fgrdMask, alpha, fgrdUnknownColors);
-	}
-	{
-		Timer t("conversion finale");
-		fgrdUnknownColors *= 255;
-		fgrdUnknownColors.convertTo(fgrdUnknownColors, CV_8UC3);
 
-		foreground += fgrdUnknownColors;
+	AlphaBlend::computeAlpha(fltInput / 255, fgrdSelectedColors, bgrInpainted,
+		bgrdMask, fgrdMask, alpha, fgrdUnknownColors);
 
-		AlphaBlend::alphaBlend(foreground, background, alpha, resultImage);
-	}
+	fgrdUnknownColors *= 255;
+	fgrdUnknownColors.convertTo(fgrdUnknownColors, CV_8UC3);
+
+	foreground += fgrdUnknownColors;
+
+	/*
+	** Alpha blending 
+	*/
+
+	AlphaBlend::alphaBlend(foreground, background, alpha, resultImage);
+
 }
 
 
